@@ -127,9 +127,6 @@ npm run dev
 * **Problem:** CORS errors when frontend tried to call backend on Render
   **Solution:** Added `cors()` middleware in Express and updated frontend API URLs to deployed backend.
 
-* **Problem:** `uuid` import errors in ESM modules
-  **Solution:** Updated import syntax to `import { v4 as uuidv4 } from 'uuid';` and removed duplicate declarations.
-
 * **Problem:** Large base64 images caused payload issues
   **Solution:** Increased JSON payload limit in Express: `express.json({ limit: "10mb" })`.
 
