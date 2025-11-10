@@ -82,7 +82,7 @@ export default function Signup() {
                 {[
                   "Enter product description",
                   "AI enhances your prompt", 
-                  "Generate with DALL·E",
+                  "Generate with AI",
                   "Download professional images"
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center space-x-3 sm:space-x-4">
