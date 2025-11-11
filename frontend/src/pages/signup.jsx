@@ -9,6 +9,8 @@ export default function Signup() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
   const handleSignup = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -21,7 +23,7 @@ export default function Signup() {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/signup", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -82,7 +84,7 @@ export default function Signup() {
                 {[
                   "Enter product description",
                   "AI enhances your prompt", 
-                  "Generate with AI",
+                  "Generate with DALL·E",
                   "Download professional images"
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center space-x-3 sm:space-x-4">

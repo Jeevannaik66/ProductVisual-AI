@@ -8,13 +8,16 @@ export default function Login() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  // Use backend URL from environment variable
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -23,10 +26,10 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
 
-      // ✅ Save session
-      localStorage.setItem("userSession", JSON.stringify(data.session));
+      // Save session/token
+      localStorage.setItem("userSession", JSON.stringify(data.session || data));
 
-      // ✅ Redirect to dashboard
+      // Redirect to dashboard
       navigate("/dashboard");
     } catch (err) {
       setError(err.message);
