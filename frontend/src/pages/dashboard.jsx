@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
+// API Base URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 // Component: Header with User Info
 const DashboardHeader = ({ userName, userEmail, onLogout, onNavigateToGallery }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -364,7 +367,7 @@ export default function Dashboard() {
       const sessionStr = localStorage.getItem("userSession");
       const token = sessionStr ? JSON.parse(sessionStr).access_token : null;
 
-      const res = await fetch("http://localhost:5000/api/enhance", {
+      const res = await fetch(`${API_BASE_URL}/api/enhance`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -411,7 +414,7 @@ export default function Dashboard() {
       const sessionStr = localStorage.getItem("userSession");
       const token = sessionStr ? JSON.parse(sessionStr).access_token : null;
 
-      const res = await fetch("http://localhost:5000/api/generate", {
+      const res = await fetch(`${API_BASE_URL}/api/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

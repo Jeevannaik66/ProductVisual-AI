@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+// API Base URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 export default function Generations() {
   const navigate = useNavigate();
   const [generations, setGenerations] = useState([]);
@@ -29,7 +32,7 @@ export default function Generations() {
         const token = JSON.parse(sessionStr).access_token;
 
         const res = await fetch(
-          "http://localhost:5000/api/generate/generations",
+          `${API_BASE_URL}/api/generate/generations`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -56,7 +59,7 @@ export default function Generations() {
       const token = JSON.parse(localStorage.getItem("userSession")).access_token;
 
       const res = await fetch(
-        `http://localhost:5000/api/generate/generations/${id}`,
+        `${API_BASE_URL}/api/generate/generations/${id}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
