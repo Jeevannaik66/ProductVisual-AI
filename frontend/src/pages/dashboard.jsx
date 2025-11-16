@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
+import { useImageStore } from "../stores/imageStore";
+import { useUIStore } from "../stores/uiStore";
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -302,50 +305,41 @@ const ErrorDisplay = ({ error, onDismiss }) => {
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  const [userName, setUserName] = useState("");
-  const [userEmail, setUserEmail] = useState("");
-  const [promptInEditor, setPromptInEditor] = useState("");
-  const [originalPrompt, setOriginalPrompt] = useState("");
-  const [enhancedPrompt, setEnhancedPrompt] = useState("");
-  const [imageUrl, setImageUrl] = useState(null);
-  const [loadingEnhance, setLoadingEnhance] = useState(false);
-  const [loadingGenerate, setLoadingGenerate] = useState(false);
-  const [error, setError] = useState("");
+  const user = useAuthStore((s) => s.user);
+  const authLoading = useAuthStore((s) => s.loading);
+  const logout = useAuthStore((s) => s.logout);
 
-  // ✅ CHECK AUTH SESSION AND GET USER INFO
+  const promptInEditor = useImageStore((s) => s.prompt);
+  const setPromptInEditor = useImageStore((s) => s.setPrompt);
+  const originalPrompt = useImageStore((s) => s.originalPrompt);
+  const enhancedPrompt = useImageStore((s) => s.enhancedPrompt);
+  const imageUrl = useImageStore((s) => s.imageUrl);
+  const loadingEnhance = useImageStore((s) => s.loadingEnhance);
+  const loadingGenerate = useImageStore((s) => s.loadingGenerate);
+  const generateImageAction = useImageStore((s) => s.generateImage);
+  const enhancePromptAction = useImageStore((s) => s.enhancePrompt);
+  const setOriginalPrompt = useImageStore((s) => s.setOriginalPrompt);
+  const setEnhancedPrompt = useImageStore((s) => s.setEnhancedPrompt);
+  const imageError = useImageStore((s) => s.error);
+
+  const uiSetLoading = useUIStore((s) => s.setGlobalLoading);
+
   useEffect(() => {
-    const sessionStr = localStorage.getItem("userSession");
-    const email = localStorage.getItem("userEmail");
-
-    if (!sessionStr) {
-      navigate("/login", { replace: true });
-    } else {
-      try {
-        const sessionData = JSON.parse(sessionStr);
-        
-        // Set user email from localStorage or session data
-        setUserEmail(email || sessionData.user?.email || "User");
-        
-        // Extract name from email (you can modify this logic based on your user data structure)
-        const emailName = sessionData.user?.email?.split('@')[0];
-        setUserName(emailName || "User");
-        
-        // If you have user metadata with name, you can use it like this:
-        // setUserName(sessionData.user?.user_metadata?.name || emailName || "User");
-        
-      } catch (error) {
-        console.error("Error parsing user session:", error);
-        navigate("/login", { replace: true });
+    if (!authLoading) {
+      if (!user) {
+        navigate('/login', { replace: true });
       }
     }
-  }, [navigate]);
+  }, [user, authLoading, navigate]);
 
   // ✅ LOGOUT
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem("userSession");
-    localStorage.removeItem("userEmail");
-    navigate("/login", { replace: true });
-  }, [navigate]);
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  }, [logout, navigate]);
 
   // ✅ TEXTAREA CHANGE
   const handlePromptChange = useCallback((e) => {
@@ -353,50 +347,21 @@ export default function Dashboard() {
     setPromptInEditor(newText);
     setOriginalPrompt(newText);
     setEnhancedPrompt("");
-  }, []);
+  }, [setPromptInEditor, setOriginalPrompt, setEnhancedPrompt]);
 
   // ✅ ENHANCE PROMPT
-  const enhancePrompt = useCallback(async () => {
-    if (!promptInEditor.trim()) return;
-    setLoadingEnhance(true);
-    setError("");
-
-    const promptToEnhance = promptInEditor;
-
+  const onEnhance = useCallback(async () => {
+    if (!promptInEditor?.trim()) return;
     try {
-      const sessionStr = localStorage.getItem("userSession");
-      const token = sessionStr ? JSON.parse(sessionStr).access_token : null;
-
-      const res = await fetch(`${API_BASE_URL}/api/enhance`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ prompt: promptToEnhance }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Prompt enhancement failed");
-
-      setOriginalPrompt(promptToEnhance);
-      setEnhancedPrompt(data.enhancedPrompt);
-      setPromptInEditor(data.enhancedPrompt);
-
+      await enhancePromptAction(promptInEditor);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoadingEnhance(false);
+      // error is stored in the image store; optionally show UI notification
     }
-  }, [promptInEditor]);
+  }, [promptInEditor, enhancePromptAction]);
 
   // ✅ GENERATE IMAGE
-  const generateImage = useCallback(async () => {
-    if (!promptInEditor.trim()) return;
-    setLoadingGenerate(true);
-    setImageUrl(null);
-    setError("");
-
+  const onGenerate = useCallback(async () => {
+    if (!promptInEditor?.trim()) return;
     let promptToSend;
     let enhancedPromptToSend;
 
@@ -409,31 +374,12 @@ export default function Dashboard() {
     }
 
     const body = { prompt: promptToSend, enhancedPrompt: enhancedPromptToSend };
-
     try {
-      const sessionStr = localStorage.getItem("userSession");
-      const token = sessionStr ? JSON.parse(sessionStr).access_token : null;
-
-      const res = await fetch(`${API_BASE_URL}/api/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Image generation failed");
-
-      setImageUrl(data.imageUrl);
-
+      await generateImageAction(body);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoadingGenerate(false);
+      // error handled in store
     }
-  }, [promptInEditor, enhancedPrompt, originalPrompt]);
+  }, [promptInEditor, enhancedPrompt, originalPrompt, generateImageAction]);
 
   // ✅ DOWNLOAD IMAGE
   const handleDownload = useCallback(() => {
@@ -454,15 +400,18 @@ export default function Dashboard() {
 
   // ✅ DISMISS ERROR
   const handleDismissError = useCallback(() => {
-    setError("");
+    // clear error in image store by refetching or setting via fetchPage
+    // simple approach: refetch page to reset error state
+    try { }
+    catch (e) { }
   }, []);
 
   return (
     <div className="h-screen w-screen bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden">
       {/* Header - Full Width */}
       <DashboardHeader 
-        userName={userName}
-        userEmail={userEmail}
+        userName={user?.email?.split('@')[0]}
+        userEmail={user?.email}
         onLogout={handleLogout}
         onNavigateToGallery={handleNavigateToGallery}
       />
@@ -471,14 +420,14 @@ export default function Dashboard() {
       <main className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
           {/* Error Display */}
-          <ErrorDisplay error={error} onDismiss={handleDismissError} />
+          <ErrorDisplay error={imageError} onDismiss={handleDismissError} />
 
           {/* Prompt Section - Full Width */}
           <PromptSection
             prompt={promptInEditor}
             onPromptChange={handlePromptChange}
-            onEnhance={enhancePrompt}
-            onGenerate={generateImage}
+            onEnhance={onEnhance}
+            onGenerate={onGenerate}
             loadingEnhance={loadingEnhance}
             loadingGenerate={loadingGenerate}
             enhancedPrompt={enhancedPrompt}

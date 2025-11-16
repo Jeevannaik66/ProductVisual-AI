@@ -1,6 +1,7 @@
 // backend/routes/enhance.js
 import express from 'express';
 import { enhanceHandler } from '../controllers/imageController.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
@@ -10,6 +11,6 @@ const router = express.Router();
  * Returns: { enhancedPrompt }
  * Public route (no auth required)
  */
-router.post('/', enhanceHandler);
+router.post('/', asyncHandler(enhanceHandler));
 
 export default router;

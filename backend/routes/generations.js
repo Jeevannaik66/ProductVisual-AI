@@ -6,20 +6,22 @@ import {
   getGenerationsHandler,
   deleteGenerationHandler
 } from '../controllers/imageController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/authMiddleware.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
-// ✅ Generate image
-router.post('/', authMiddleware, generateHandler);
+// ✅ Generate image (optional auth: allow guests)
+// optional auth for generation (guests allowed)
+router.post('/', optionalAuthMiddleware, asyncHandler(generateHandler));
 
 // ✅ Save generation metadata
-router.post('/save', authMiddleware, saveGenerationHandler);
+router.post('/save', authMiddleware, asyncHandler(saveGenerationHandler));
 
 // ✅ Fetch all generations for logged-in user
-router.get('/generations', authMiddleware, getGenerationsHandler);
+router.get('/generations', authMiddleware, asyncHandler(getGenerationsHandler));
 
 // ✅ Delete a specific generation by ID
-router.delete('/generations/:id', authMiddleware, deleteGenerationHandler);
+router.delete('/generations/:id', authMiddleware, asyncHandler(deleteGenerationHandler));
 
 export default router;

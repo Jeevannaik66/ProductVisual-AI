@@ -1,40 +1,26 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from 'react-hook-form';
+import { useAuthStore } from '../stores/authStore';
+import { useToast } from '../components/ToastContext.jsx';
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { register, handleSubmit } = useForm();
   const navigate = useNavigate();
+  const login = useAuthStore((s) => s.login);
+  const loading = useAuthStore((s) => s.loading);
+  const error = useAuthStore((s) => s.error);
+  const toast = useToast();
 
   // Use backend URL from environment variable
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
+  const handleLogin = async (data) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login failed");
-
-      // Save session/token
-      localStorage.setItem("userSession", JSON.stringify(data.session || data));
-
-      // Redirect to dashboard
+      await login(data.email, data.password);
+      toast.success('Signed in');
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      toast.error(err.message || 'Login failed');
     }
   };
 
@@ -118,7 +104,7 @@ export default function Login() {
                 </div>
               )}
 
-              <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+              <form onSubmit={handleSubmit(handleLogin)} className="space-y-4 sm:space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 sm:mb-3">
                     Email Address
@@ -126,10 +112,8 @@ export default function Login() {
                   <input
                     type="email"
                     placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register('email', { required: true })}
                     className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
-                    required
                   />
                 </div>
 
@@ -140,10 +124,8 @@ export default function Login() {
                   <input
                     type="password"
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register('password', { required: true })}
                     className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
-                    required
                   />
                 </div>
 
@@ -154,10 +136,7 @@ export default function Login() {
                 >
                   {loading ? (
                     <>
-                      <svg className="animate-spin h-4 w-4 sm:h-5 sm:w-5 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                      <div className="animate-spin h-4 w-4 sm:h-5 sm:w-5 text-white border-2 rounded-full border-t-white"></div>
                       <span className="text-sm sm:text-base">Signing in...</span>
                     </>
                   ) : (

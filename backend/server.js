@@ -1,37 +1,77 @@
 // backend/server.js
+import 'dotenv/config';
 import dotenv from "dotenv";
-dotenv.config(); // ✅ Load environment variables first
+dotenv.config(); // Load environment variables first
 
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
-// ✅ Import API routes
+// Import API routes
 import authRoutes from "./routes/auth.js";
 import enhanceRoutes from "./routes/enhance.js";
 import generateRoutes from "./routes/generations.js";
 
 const app = express();
 
-// ✅ Middlewares
-app.use(cors());
-app.use(express.json({ limit: "10mb" })); // ✅ Increase JSON size limit for images
+// Basic security middleware
+app.use(helmet());
+
+// Basic rate limiting
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200, // limit each IP
+  })
+);
+// ✅ CORS configuration for deployed frontend
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:5173", // Vite dev or your deployed frontend
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin like mobile apps or curl
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    credentials: true, // allow cookies if needed
+  })
+);
+
+// Parse JSON bodies (with increased limit for images)
+app.use(express.json({ limit: "10mb" }));
+
+// Parse cookies for cookie-based auth
+app.use(cookieParser());
 
 // ✅ API Routes
-app.use("/api/auth", authRoutes);         // Authentication routes
-app.use("/api/enhance", enhanceRoutes);   // Prompt enhancement route
-app.use("/api/generate", generateRoutes); // Image generation & generations CRUD
+app.use("/api/auth", authRoutes);
+app.use("/api/enhance", enhanceRoutes);
+app.use("/api/generate", generateRoutes);
 
 // ✅ Test route
 app.get("/", (req, res) => {
   res.send("Backend is running!");
 });
 
-// ✅ Error-handling middleware (optional but helpful)
+// ✅ Global error-handling middleware
 app.use((err, req, res, next) => {
-  console.error("Global error handler:", err.stack);
-  res.status(500).json({ error: "Internal server error" });
+  console.error("Global error handler:", err && err.stack ? err.stack : err);
+  // Default to 500 unless err.status provided
+  const status = err?.status || 500;
+  res.status(status).json({ error: err?.message || "Internal server error" });
 });
 
 // ✅ Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

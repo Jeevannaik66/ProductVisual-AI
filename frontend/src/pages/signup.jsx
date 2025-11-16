@@ -1,44 +1,30 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from 'react-hook-form';
+import { useAuthStore } from '../stores/authStore';
+import { useToast } from '../components/ToastContext.jsx';
 
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { register, handleSubmit, watch } = useForm();
   const navigate = useNavigate();
+  const signup = useAuthStore((s) => s.signup);
+  const loading = useAuthStore((s) => s.loading);
+  const error = useAuthStore((s) => s.error);
+  const toast = useToast();
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
+  const handleSignup = async (data) => {
+    if (data.password !== data.confirmPassword) {
+      toast.error('Passwords do not match');
       return;
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "Signup failed");
-      
-      alert("Signup successful! Please login.");
-      navigate("/login");
+      await signup(data.email, data.password);
+      toast.success('Account created. Please sign in.');
+      navigate('/login');
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      toast.error(err.message || 'Signup failed');
     }
   };
 
@@ -128,7 +114,7 @@ export default function Signup() {
               )}
 
               {/* Signup Form */}
-              <form onSubmit={handleSignup} className="space-y-4 sm:space-y-6">
+              <form onSubmit={handleSubmit(handleSignup)} className="space-y-4 sm:space-y-6">
                 {/* Email Field */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 sm:mb-3">
@@ -136,11 +122,9 @@ export default function Signup() {
                   </label>
                   <input
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register('email', { required: true })}
                     className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                     placeholder="Enter your email"
-                    required
                   />
                 </div>
 
@@ -151,11 +135,9 @@ export default function Signup() {
                   </label>
                   <input
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register('password', { required: true })}
                     className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                     placeholder="Create a password"
-                    required
                   />
                 </div>
 
@@ -166,11 +148,9 @@ export default function Signup() {
                   </label>
                   <input
                     type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    {...register('confirmPassword', { required: true })}
                     className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                     placeholder="Confirm your password"
-                    required
                   />
                 </div>
 

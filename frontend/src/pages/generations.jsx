@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import { useToast } from '../components/ToastContext.jsx';
+import { useAuth } from "../AuthContext.jsx";
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -11,14 +14,17 @@ export default function Generations() {
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const toast = useToast();
 
-  // ✅ Check auth session
+  const { user, loading: authLoading } = useAuth();
+
+  // ✅ Redirect to login if unauthenticated
   useEffect(() => {
-    const sessionStr = localStorage.getItem("userSession");
-    if (!sessionStr) {
+    if (!authLoading && !user) {
       navigate("/login", { replace: true });
     }
-  }, [navigate]);
+  }, [user, authLoading, navigate]);
 
   // ✅ Fetch generations
   useEffect(() => {
@@ -26,15 +32,15 @@ export default function Generations() {
       setLoading(true);
 
       try {
-        const sessionStr = localStorage.getItem("userSession");
-        if (!sessionStr) throw new Error("No session found");
+        // ensure user present before fetching
+        if (authLoading || !user) {
+          setLoading(false);
+          return;
+        }
 
-        const token = JSON.parse(sessionStr).access_token;
-
-        const res = await fetch(
-          `${API_BASE_URL}/api/generate/generations`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await fetch(`${API_BASE_URL}/api/generate/generations`, {
+          credentials: 'include',
+        });
 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to fetch generations");
@@ -51,28 +57,31 @@ export default function Generations() {
   }, []);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this image?")) return;
+    // open confirm dialog
+    setConfirmDeleteId(id);
+  };
 
+  const performDelete = async (id) => {
     setDeleteLoading(id);
-    
     try {
-      const token = JSON.parse(localStorage.getItem("userSession")).access_token;
+      const res = await fetch(`${API_BASE_URL}/api/generate/generations/${id}`, {
+        method: "DELETE",
+        credentials: 'include',
+      });
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/generate/generations/${id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Delete failed');
+      }
 
       setGenerations((prev) => prev.filter((g) => g.id !== id));
+      toast.success('Image deleted');
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Delete failed');
+      toast.error(err.message || 'Delete failed');
     } finally {
       setDeleteLoading(null);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -306,6 +315,15 @@ export default function Generations() {
                       disabled={deleteLoading === gen.id}
                       className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2"
                     >
+
+                <ConfirmDialog
+                  open={!!confirmDeleteId}
+                  title="Delete Image"
+                  message="Are you sure you want to delete this image? This action cannot be undone."
+                  loading={!!deleteLoading}
+                  onCancel={() => setConfirmDeleteId(null)}
+                  onConfirm={() => performDelete(confirmDeleteId)}
+                />
                       {deleteLoading === gen.id ? (
                         <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

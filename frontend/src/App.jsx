@@ -1,13 +1,18 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import Spinner from './components/Spinner.jsx';
+import { useAuthStore } from './stores/authStore';
 import Signup from "./pages/signup";
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
 import Generations from "./pages/generations"; // ✅ import Generations page
 
-// ✅ Check if user is logged in
+// ProtectedRoute checks authentication via cookie-backed endpoint
 const ProtectedRoute = ({ children }) => {
-  const isLoggedIn = localStorage.getItem("userSession");
-  return isLoggedIn ? children : <Navigate to="/login" replace />;
+  const user = useAuthStore((s) => s.user);
+  const loading = useAuthStore((s) => s.loading);
+  if (loading) return <Spinner />;
+  return user ? children : <Navigate to="/login" replace />;
 };
 
 function App() {
