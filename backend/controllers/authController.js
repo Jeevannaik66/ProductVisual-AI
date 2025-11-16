@@ -23,22 +23,12 @@ export const login = async (req, res) => {
     if (!session) return res.status(500).json({ error: 'No session returned' });
 
     // Set HttpOnly cookie (access token). Refresh token handling omitted for brevity.
-    // Supabase returns expires_in (seconds). Convert to milliseconds for maxAge.
     const maxAge = session.expires_in ? session.expires_in * 1000 : 24 * 60 * 60 * 1000;
-
-    // Cookie options:
-    // - httpOnly: true prevents JS access to the cookie (more secure)
-    // - secure: only send cookie over HTTPS in production
-    // - sameSite: 'none' is required for cross-site cookies (frontend on a different origin)
-    // - maxAge: lifespan in milliseconds
-    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('sb_access_token', session.access_token, {
       httpOnly: true,
-      secure: isProd, // must be true for sameSite='none' to work in browsers
-      sameSite: 'none', // allow cross-site cookie for Vercel frontend -> Render backend
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge,
-      // Ensure cookie is sent for all paths in the API
-      path: '/',
     });
 
     res.json({ message: 'Login successful' });
@@ -49,14 +39,7 @@ export const login = async (req, res) => {
 
 // Logout - clear cookie
 export const logout = async (req, res) => {
-  // Clear cookie using the same options it was set with.
-  const isProd = process.env.NODE_ENV === 'production';
-  res.clearCookie('sb_access_token', {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: 'none',
-    path: '/',
-  });
+  res.clearCookie('sb_access_token', { httpOnly: true, sameSite: 'lax' });
   res.json({ message: 'Logged out' });
 };
 

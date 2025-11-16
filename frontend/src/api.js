@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
 
 async function request(path, opts = {}) {
   const url = `${API_BASE_URL}${path}`;
-  const res = await fetch(url, { ...opts, credentials: 'include' });
+  const res = await fetch(url, { credentials: 'include', ...opts });
   const contentType = res.headers.get('content-type') || '';
   let body = null;
   if (contentType.includes('application/json')) {

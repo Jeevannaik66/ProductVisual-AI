@@ -26,27 +26,23 @@ app.use(
     max: 200, // limit each IP
   })
 );
-// CORS configuration: allow the frontend origin (dev or production) and enable credentials
-// FRONTEND_URL should be set in your environment to the deployed frontend URL (e.g. https://product-ad-generator.vercel.app)
-// FALLBACK: default to Vite dev server at http://localhost:5173 when FRONTEND_URL isn't provided
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-
-const allowedOrigins = [FRONTEND_URL];
+// ✅ CORS configuration for deployed frontend
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:5173", // Vite dev or your deployed frontend
+];
 
 app.use(
   cors({
-    // origin: dynamic whitelist check
     origin: function (origin, callback) {
-      // If no origin (e.g. curl, server-to-server), allow it
+      // allow requests with no origin like mobile apps or curl
       if (!origin) return callback(null, true);
-      // If the origin is in our whitelist, allow it
-      if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
-      // Otherwise, reject
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-      return callback(new Error(msg), false);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
     },
-    // Allow sending cookies (HttpOnly) from the browser
-    credentials: true,
+    credentials: true, // allow cookies if needed
   })
 );
 
