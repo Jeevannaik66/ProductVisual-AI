@@ -1,97 +1,32 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Spinner from './components/Spinner.jsx';
-import { useAuthStore } from './stores/authStore.js';
-import Signup from "./pages/signup.jsx";
-import Login from "./pages/login.jsx";
-import Dashboard from "./pages/dashboard.jsx";
-import Generations from "./pages/generations.jsx";
+import { useAuthStore } from './stores/authStore';
+import Signup from "./pages/signup";
+import Login from "./pages/login";
+import Dashboard from "./pages/dashboard";
+import Generations from "./pages/generations"; // ✅ import Generations page
 
-/**
- * --- Protected Route ---
- * Best Practice: Assumes the global auth check (`checkAuth`) has already run.
- * This component's only job is to check if a user *exists* in the state.
- * If not, it redirects to the login page.
- */
+// ProtectedRoute checks authentication via cookie-backed endpoint
 const ProtectedRoute = ({ children }) => {
   const user = useAuthStore((s) => s.user);
-  // No `loading` check is needed here because the `App` component
-  // is now handling the *initialization* state.
+  const loading = useAuthStore((s) => s.loading);
+  if (loading) return <Spinner />;
   return user ? children : <Navigate to="/login" replace />;
 };
 
-/**
- * --- Public Route ---
- * Best Practice: A route that *only* public users should see (e.g., login, signup).
- * If a logged-in user tries to visit this, they are redirected
- * to their main dashboard.
- */
-const PublicRoute = ({ children }) => {
-  const user = useAuthStore((s) => s.user);
-  return user ? <Navigate to="/dashboard" replace /> : children;
-};
-
-/**
- * --- Root Redirect ---
- * A simple component to handle the root URL ("/")
- * - Logged-in users go to "/dashboard"
- * - Public users go to "/signup"
- */
-const RootRedirect = () => {
-  const user = useAuthStore((s) => s.user);
-  return user ? <Navigate to="/dashboard" replace /> : <Navigate to="/signup" replace />;
-};
-
 function App() {
-  // Select the initialization status and the action
-  const isInitialized = useAuthStore((s) => s.isInitialized);
-  const checkAuth = useAuthStore((s) => s.checkAuth);
-
-  // --- GLOBAL AUTH CHECK ---
-  // On first app load, run `checkAuth` *once*.
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]); // `checkAuth` is stable, so this runs once on mount.
-
-  // --- INITIALIZATION LOADING ---
-  // Best Practice: Do *not* render any routes until the app knows
-  // if a user is logged in or not. This prevents "flashes" of
-  // the login page for already-authenticated users.
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen w-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
-
-  // --- APP ROUTER ---
-  // This code only runs *after* isInitialized is true.
   return (
     <Router>
       <Routes>
-        {/* Root redirector handles where to send users from "/" */}
-        <Route path="/" element={<RootRedirect />} />
+        {/* Redirect root to signup */}
+        <Route path="/" element={<Navigate to="/signup" replace />} />
 
-        {/* Public Routes (e.g., login, signup) */}
-        <Route
-          path="/signup"
-          element={
-            <PublicRoute>
-              <Signup />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          }
-        />
+        {/* Public Routes */}
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
 
-        {/* Protected Routes (e.g., app dashboard) */}
+        {/* ✅ Protected Dashboard Route */}
         <Route
           path="/dashboard"
           element={
@@ -100,6 +35,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* ✅ Protected Generations Route */}
         <Route
           path="/generations"
           element={
@@ -109,8 +46,8 @@ function App() {
           }
         />
 
-        {/* Catch-all route redirects to the correct root */}
-        <Route path="*" element={<RootRedirect />} />
+        {/* Unknown routes redirect back */}
+        <Route path="*" element={<Navigate to="/signup" replace />} />
       </Routes>
     </Router>
   );
