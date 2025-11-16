@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { useToast } from '../components/ToastContext.jsx';
 import { useAuth } from "../AuthContext.jsx";
-
-// API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { api } from '../api.js';
 
 export default function Generations() {
   const navigate = useNavigate();
@@ -38,23 +36,17 @@ export default function Generations() {
           return;
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/generate/generations`, {
-          credentials: 'include',
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to fetch generations");
-
+        const data = await api.getGenerations();
         setGenerations(data.generations || []);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Failed to fetch generations');
       }
 
       setLoading(false);
     };
 
     fetchGenerations();
-  }, []);
+  }, [authLoading, user]);
 
   const handleDelete = async (id) => {
     // open confirm dialog
@@ -64,16 +56,7 @@ export default function Generations() {
   const performDelete = async (id) => {
     setDeleteLoading(id);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/generate/generations/${id}`, {
-        method: "DELETE",
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Delete failed');
-      }
-
+      await api.deleteGeneration(id);
       setGenerations((prev) => prev.filter((g) => g.id !== id));
       toast.success('Image deleted');
     } catch (err) {
