@@ -1,98 +1,170 @@
 import { create } from 'zustand';
 import { api } from '../api.js';
 
-export const useImageStore = create((set, get) => ({
+// --- Initial State ---
+// Define a clean initial state. This is great for resetting.
+const initialState = {
+  // Generation state
   prompt: '',
   originalPrompt: '',
   enhancedPrompt: '',
-  imageUrl: null,
-  images: [],
-  loading: false,
+  imageUrl: null, // The result of the *last* generation
+
+  // List state
+  images: [], // This will *only* hold the current page's images
+  loadingList: false, // For fetching the list
   loadingEnhance: false,
   loadingGenerate: false,
-  page: 1,
-  perPage: 12,
-  total: 0,
   error: null,
 
-  setPrompt: (p) => set({ prompt: p }),
-  setOriginalPrompt: (p) => set({ originalPrompt: p }),
-  setEnhancedPrompt: (p) => set({ enhancedPrompt: p }),
-  setImageUrl: (u) => set({ imageUrl: u }),
+  // Server-side pagination state
+  pagination: {
+    currentPage: 1,
+    pageSize: 12,
+    totalItems: 0,
+    totalPages: 0,
+  },
+};
 
-  fetchAllGenerations: async () => {
-    set({ loading: true, error: null });
+// --- Store Creation ---
+export const useImageStore = create((set, get) => ({
+  ...initialState,
+
+  // --- ACTIONS ---
+
+  /**
+   * ACTION: clearGenerationState
+   * DESCRIPTION: Resets the prompt and imageURL fields, ready for a new generation.
+   * This is what components should call, NOT manual setters.
+   */
+  clearGenerationState: () => {
+    set({
+      prompt: '',
+      originalPrompt: '',
+      enhancedPrompt: '',
+      imageUrl: null,
+      error: null,
+    });
+  },
+
+  /**
+   * ACTION: setPrompt (Encapsulated)
+   * DESCRIPTION: The *only* action that should set the main prompt.
+   */
+  setPrompt: (prompt) => set({ prompt }),
+
+  /**
+   * ACTION: fetchGenerations (Server-side Pagination)
+   * DESCRIPTION: Fetches a *single* page of generations from the server.
+   * This REPLACES fetchAllGenerations and fetchPage.
+   */
+  fetchGenerations: async (page, pageSize) => {
+    const { pagination } = get();
+    const newPage = page || pagination.currentPage;
+    const newPageSize = pageSize || pagination.pageSize;
+
+    set({ loadingList: true, error: null });
     try {
-      const data = await api.getGenerations();
-      const items = data.generations || [];
-      set({ images: items, total: items.length, loading: false });
-      return items;
+      // We assume the API now supports this:
+      // e.g., GET /api/generations?page=1&limit=12
+      const data = await api.getGenerations({
+        page: newPage,
+        perPage: newPageSize,
+      });
+
+      // We assume the API returns a response like:
+      // {
+      //   generations: [...],
+      //   totalItems: 100,
+      //   totalPages: 9,
+      //   currentPage: 1
+      // }
+      set({
+        images: data.generations || [],
+        pagination: {
+          currentPage: data.currentPage || newPage,
+          pageSize: newPageSize,
+          totalItems: data.totalItems || 0,
+          totalPages: data.totalPages || 0,
+        },
+        loadingList: false,
+      });
     } catch (err) {
-      set({ loading: false, error: err.message || 'Failed to fetch' });
+      set({ loadingList: false, error: err.message || 'Failed to fetch' });
       throw err;
     }
   },
 
-  fetchPage: async (page = 1, perPage = undefined) => {
-    const p = perPage ?? get().perPage;
-    set({ loading: true, page, error: null });
-    try {
-      const all = await get().fetchAllGenerations();
-      const start = (page - 1) * p;
-      const slice = all.slice(start, start + p);
-      set({ images: slice, total: all.length, loading: false });
-      return slice;
-    } catch (err) {
-      set({ loading: false, error: err.message || 'Failed to fetch page' });
-      throw err;
-    }
-  },
-
+  /**
+   * ACTION: deleteImage
+   * DESCRIPTION: Deletes an image and then intelligently refreshes the list.
+   */
   deleteImage: async (id) => {
-    set({ loading: true, error: null });
+    set({ loadingList: true, error: null });
     try {
       await api.deleteGeneration(id);
-      // refresh page
-      await get().fetchPage(get().page);
+      
+      // After delete, refetch the *current* page
+      await get().fetchGenerations();
+      
+      // Best Practice: Check if we deleted the last item on a page
+      const { images, pagination } = get();
+      if (images.length === 0 && pagination.currentPage > 1) {
+        // If the page is now empty, go to the previous page
+        await get().fetchGenerations(pagination.currentPage - 1);
+      }
     } catch (err) {
       set({ error: err.message || 'Delete failed' });
       throw err;
     } finally {
-      set({ loading: false });
+      set({ loadingList: false });
     }
   },
 
+  /**
+   * ACTION: enhancePrompt
+   * DESCRIPTION: Gets an enhanced prompt from the server.
+   */
   enhancePrompt: async (promptToEnhance) => {
-    set({ loadingEnhance: true, error: null });
+    set({ loadingEnhance: true, error: null, originalPrompt: promptToEnhance });
     try {
       const data = await api.enhance(promptToEnhance);
-      set({ enhancedPrompt: data.enhancedPrompt, originalPrompt: promptToEnhance, loadingEnhance: false });
-      return data.enhancedPrompt;
+      const enhancedPrompt = data.enhancedPrompt;
+      set({ enhancedPrompt, loadingEnhance: false });
+      return enhancedPrompt;
     } catch (err) {
       set({ loadingEnhance: false, error: err.message || 'Enhance failed' });
       throw err;
     }
   },
 
+  /**
+   * ACTION: generateImage
+   * DESCRIPTION: Generates a new image and refreshes the list.
+   */
   generateImage: async (body) => {
-    // clear previous image while generating
     set({ loadingGenerate: true, error: null, imageUrl: null });
     try {
       const data = await api.generate(body);
-      // api.generate may return an image url or generated object; try to persist imageUrl if present
+
+      // Find the resulting image URL (your logic was fine)
       const imageUrl = data?.imageUrl || data?.url || data?.result?.imageUrl || data?.result?.url || null;
-      if (imageUrl) {
-        set({ imageUrl });
-      }
+      
+      set({ imageUrl, loadingGenerate: false });
 
-      // refresh list (client-side pagination) so newly created generation appears
-      try {
-        await get().fetchPage(get().page);
-      } catch (e) {
-        // ignore refresh failures, we'll still return the generated data
+      // Best Practice: Refresh Page 1 to show the new image.
+      // This is *much* faster than refetching all.
+      if (get().pagination.currentPage === 1) {
+        await get().fetchGenerations(1);
+      } else {
+        // If user is on another page, just set page 1 as the
+        // target so it's there when they go back.
+        set(state => ({
+          pagination: { ...state.pagination, currentPage: 1 }
+        }));
+        await get().fetchGenerations(1);
       }
-
-      set({ loadingGenerate: false });
+      
       return data;
     } catch (err) {
       set({ loadingGenerate: false, error: err.message || 'Generate failed' });
@@ -100,5 +172,3 @@ export const useImageStore = create((set, get) => ({
     }
   }
 }));
-
-// prefer named export; do not default-export the hook

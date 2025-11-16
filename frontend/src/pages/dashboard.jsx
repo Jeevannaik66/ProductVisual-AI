@@ -1,17 +1,41 @@
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../stores/authStore";
-import { useImageStore } from "../stores/imageStore";
-import { useUIStore } from "../stores/uiStore";
+import { useAuthStore } from "../stores/authStore.js";
+import { useImageStore } from "../stores/imageStore.js";
 
-// API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+// --- Custom Hook (Industry Practice) ---
+/**
+ * A custom hook to detect clicks outside of a referenced element.
+ * @param {Function} handler - The function to call when a click outside is detected.
+ */
+const useClickOutside = (handler) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) {
+        handler();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [ref, handler]);
+
+  return ref;
+};
+
+// --- Child Components (Separated for Readability) ---
 
 // Component: Header with User Info
 const DashboardHeader = ({ userName, userEmail, onLogout, onNavigateToGallery }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // Use the custom hook to close the dropdown
+  const dropdownRef = useClickOutside(() => setIsDropdownOpen(false));
 
-  // Extract first name from email or use full name
   const displayName = userName || userEmail?.split('@')[0] || 'User';
 
   return (
@@ -30,8 +54,7 @@ const DashboardHeader = ({ userName, userEmail, onLogout, onNavigateToGallery })
         </div>
 
         <div className="flex items-center space-x-6">
-          {/* User Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center space-x-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl px-4 py-2 transition-colors duration-200"
@@ -99,7 +122,6 @@ const PromptSection = ({
   return (
     <section className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8">
       <div className="space-y-8">
-        {/* Section Header */}
         <div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
             Create Product Image
@@ -109,7 +131,6 @@ const PromptSection = ({
           </p>
         </div>
 
-        {/* Prompt Input */}
         <div className="space-y-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Product Description
@@ -123,7 +144,6 @@ const PromptSection = ({
           />
         </div>
 
-        {/* Enhancement Preview */}
         {enhancedPrompt && originalPrompt && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-6 transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
@@ -154,7 +174,6 @@ const PromptSection = ({
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex flex-wrap gap-6 pt-4">
           <button
             onClick={onEnhance}
@@ -211,7 +230,12 @@ const PromptSection = ({
 const ImageDisplay = ({ imageUrl, onDownload, loadingGenerate }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  if (!imageUrl) return null;
+  // Reset imageLoaded state when imageUrl changes
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [imageUrl]);
+
+  if (!imageUrl && !loadingGenerate) return null;
 
   return (
     <section className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 mt-8">
@@ -220,17 +244,19 @@ const ImageDisplay = ({ imageUrl, onDownload, loadingGenerate }) => {
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
             Generated Image
           </h2>
-          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Ready
-          </span>
+          {imageUrl && imageLoaded && (
+            <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Ready
+            </span>
+          )}
         </div>
 
         <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 min-h-[500px] flex items-center justify-center">
-          {!imageLoaded && loadingGenerate && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 rounded-2xl">
+          {loadingGenerate && !imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 rounded-2xl">
               <div className="text-center">
                 <svg className="animate-spin h-16 w-16 text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -242,16 +268,18 @@ const ImageDisplay = ({ imageUrl, onDownload, loadingGenerate }) => {
             </div>
           )}
 
-          <img
-            src={imageUrl}
-            alt="AI Generated Product Visual"
-            className={`w-full h-auto max-h-[600px] object-contain rounded-2xl transition-opacity duration-500 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onLoad={() => setImageLoaded(true)}
-          />
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt="AI Generated Product Visual"
+              className={`w-full h-auto max-h-[600px] object-contain rounded-2xl transition-opacity duration-500 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              onLoad={() => setImageLoaded(true)}
+            />
+          )}
 
-          {imageLoaded && (
+          {imageLoaded && imageUrl && (
             <div className="absolute bottom-6 right-6">
               <button
                 onClick={onDownload}
@@ -275,7 +303,7 @@ const ErrorDisplay = ({ error, onDismiss }) => {
   if (!error) return null;
 
   return (
-    <div className="w-full mb-8 p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl animate-fade-in">
+    <div className="w-full mb-8 p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -301,67 +329,88 @@ const ErrorDisplay = ({ error, onDismiss }) => {
   );
 };
 
-// Main Dashboard Component
+// --- Main Dashboard Component ---
 export default function Dashboard() {
   const navigate = useNavigate();
 
+  // --- Auth Store (Separation of Concerns) ---
+  // This component *assumes* it's protected.
+  // We only need the user for display and the logout action.
   const user = useAuthStore((s) => s.user);
-  const authLoading = useAuthStore((s) => s.loading);
   const logout = useAuthStore((s) => s.logout);
 
-  const promptInEditor = useImageStore((s) => s.prompt);
-  const setPromptInEditor = useImageStore((s) => s.setPrompt);
-  const originalPrompt = useImageStore((s) => s.originalPrompt);
-  const enhancedPrompt = useImageStore((s) => s.enhancedPrompt);
-  const imageUrl = useImageStore((s) => s.imageUrl);
-  const loadingEnhance = useImageStore((s) => s.loadingEnhance);
-  const loadingGenerate = useImageStore((s) => s.loadingGenerate);
-  const generateImageAction = useImageStore((s) => s.generateImage);
-  const enhancePromptAction = useImageStore((s) => s.enhancePrompt);
-  const setOriginalPrompt = useImageStore((s) => s.setOriginalPrompt);
-  const setEnhancedPrompt = useImageStore((s) => s.setEnhancedPrompt);
-  const imageError = useImageStore((s) => s.error);
+  // --- Image Store (Single Source of Truth) ---
+  // Select all state and actions needed for this page.
+  const {
+    prompt: promptInEditor,
+    originalPrompt,
+    enhancedPrompt,
+    imageUrl,
+    loadingEnhance,
+    loadingGenerate,
+    error: imageError,
+  } = useImageStore((s) => ({
+    prompt: s.prompt,
+    originalPrompt: s.originalPrompt,
+    enhancedPrompt: s.enhancedPrompt,
+    imageUrl: s.imageUrl,
+    loadingEnhance: s.loadingEnhance,
+    loadingGenerate: s.loadingGenerate,
+    error: s.error,
+  }));
 
-  const uiSetLoading = useUIStore((s) => s.setGlobalLoading);
+  const {
+    setPrompt: setPromptInEditor,
+    generateImage: generateImageAction,
+    enhancePrompt: enhancePromptAction,
+    clearGenerationState,
+    clearError: clearImageError, // Using the new action
+  } = useImageStore((s) => ({
+    setPrompt: s.setPrompt,
+    generateImage: s.generateImage,
+    enhancePrompt: s.enhancePrompt,
+    clearGenerationState: s.clearGenerationState,
+    clearError: s.clearError,
+  }));
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        navigate('/login', { replace: true });
-      }
-    }
-  }, [user, authLoading, navigate]);
+  // --- Callbacks (Optimized) ---
 
   // ✅ LOGOUT
-  const handleLogout = useCallback(async () => {
-    try {
-      await logout();
-    } finally {
-      navigate('/login', { replace: true });
-    }
-  }, [logout, navigate]);
+  // Simplified: Just call logout. `App.jsx` handles the redirect.
+  const handleLogout = useCallback(() => {
+    logout();
+  }, [logout]);
 
   // ✅ TEXTAREA CHANGE
+  // Correctly uses store actions to manage state.
   const handlePromptChange = useCallback((e) => {
     const newText = e.target.value;
-    setPromptInEditor(newText);
-    setOriginalPrompt(newText);
-    setEnhancedPrompt("");
-  }, [setPromptInEditor, setOriginalPrompt, setEnhancedPrompt]);
+    if (enhancedPrompt) {
+      // If we had an enhancement, it's now invalid.
+      // Reset the generation state (which clears enhancement fields)
+      clearGenerationState();
+      // ...but restore the prompt the user is typing
+      setPromptInEditor(newText);
+    } else {
+      // No enhancement, just update the prompt
+      setPromptInEditor(newText);
+    }
+  }, [setPromptInEditor, enhancedPrompt, clearGenerationState]);
 
   // ✅ ENHANCE PROMPT
+  // Simplified: No try/catch. The store handles its own errors.
   const onEnhance = useCallback(async () => {
     if (!promptInEditor?.trim()) return;
-    try {
-      await enhancePromptAction(promptInEditor);
-    } catch (err) {
-      // error is stored in the image store; optionally show UI notification
-    }
+    enhancePromptAction(promptInEditor);
   }, [promptInEditor, enhancePromptAction]);
 
   // ✅ GENERATE IMAGE
+  // Simplified: No try/catch. The store handles its own errors.
+  // The store (in our previous optimization) handles body creation.
   const onGenerate = useCallback(async () => {
     if (!promptInEditor?.trim()) return;
+    
+    // Logic from the *original* file (this is fine)
     let promptToSend;
     let enhancedPromptToSend;
 
@@ -374,11 +423,7 @@ export default function Dashboard() {
     }
 
     const body = { prompt: promptToSend, enhancedPrompt: enhancedPromptToSend };
-    try {
-      await generateImageAction(body);
-    } catch (err) {
-      // error handled in store
-    }
+    generateImageAction(body);
   }, [promptInEditor, enhancedPrompt, originalPrompt, generateImageAction]);
 
   // ✅ DOWNLOAD IMAGE
@@ -399,16 +444,13 @@ export default function Dashboard() {
   }, [navigate]);
 
   // ✅ DISMISS ERROR
+  // Correctly calls the new `clearError` action.
   const handleDismissError = useCallback(() => {
-    // clear error in image store by refetching or setting via fetchPage
-    // simple approach: refetch page to reset error state
-    try { }
-    catch (e) { }
-  }, []);
+    clearImageError();
+  }, [clearImageError]);
 
   return (
     <div className="h-screen w-screen bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden">
-      {/* Header - Full Width */}
       <DashboardHeader 
         userName={user?.email?.split('@')[0]}
         userEmail={user?.email}
@@ -416,13 +458,10 @@ export default function Dashboard() {
         onNavigateToGallery={handleNavigateToGallery}
       />
 
-      {/* Main Content - Full Screen Scrollable Area */}
       <main className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
-          {/* Error Display */}
           <ErrorDisplay error={imageError} onDismiss={handleDismissError} />
 
-          {/* Prompt Section - Full Width */}
           <PromptSection
             prompt={promptInEditor}
             onPromptChange={handlePromptChange}
@@ -434,7 +473,6 @@ export default function Dashboard() {
             originalPrompt={originalPrompt}
           />
 
-          {/* Image Display - Full Width */}
           <ImageDisplay
             imageUrl={imageUrl}
             onDownload={handleDownload}
@@ -442,17 +480,6 @@ export default function Dashboard() {
           />
         </div>
       </main>
-
-      {/* Custom Animations */}
-      <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }

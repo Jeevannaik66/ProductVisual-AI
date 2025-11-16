@@ -3,24 +3,66 @@ import { useForm } from 'react-hook-form';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ToastContext.jsx';
 
-export default function Login() {
-  const { register, handleSubmit } = useForm();
-  const navigate = useNavigate();
-  const login = useAuthStore((s) => s.login);
-  const loading = useAuthStore((s) => s.loading);
-  const error = useAuthStore((s) => s.error);
-  const toast = useToast();
+// --- Reusable Icon Components (for readability) ---
 
-  // Use backend URL from environment variable
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const BrandIcon = () => (
+  <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const WarningIcon = () => (
+  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const SpinnerIcon = () => (
+  <div className="animate-spin h-4 w-4 sm:h-5 sm:w-5 text-white border-2 rounded-full border-t-white" />
+);
+
+// --- Feature List (as a constant) ---
+const features = [
+  "Access your image library",
+  "Generate new product visuals", 
+  "Download high-quality images",
+  "Manage your creations"
+];
+
+// --- Main Login Component ---
+export default function Login() {
+  const { 
+    register, 
+    handleSubmit, 
+    setError,
+    formState: { errors, isSubmitting } // Use RHF's state
+  } = useForm();
+  
+  const navigate = useNavigate();
+  const login = useAuthStore((s) => s.login); // Only select what's needed
+  const toast = useToast();
 
   const handleLogin = async (data) => {
     try {
+      // The `login` action is already wrapped in a try/catch
+      // that will throw if it fails.
       await login(data.email, data.password);
       toast.success('Signed in');
       navigate("/dashboard");
     } catch (err) {
-      toast.error(err.message || 'Login failed');
+      const errorMessage = err.message || 'Login failed. Please check your credentials.';
+      // Set the error on the form itself
+      setError("root.serverError", {
+        type: "manual",
+        message: errorMessage,
+      });
+      toast.error(errorMessage);
     }
   };
 
@@ -34,9 +76,7 @@ export default function Login() {
             <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
               <div className="flex items-center space-x-3 sm:space-x-4">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
+                  <BrandIcon />
                 </div>
                 <div>
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
@@ -53,24 +93,16 @@ export default function Login() {
                   Welcome back to
                   <span className="text-blue-600 block mt-1 sm:mt-2">ProductVisual AI</span>
                 </h2>
-                
                 <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
                   Continue creating stunning product images with AI-powered generation.
                 </p>
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                {[
-                  "Access your image library",
-                  "Generate new product visuals", 
-                  "Download high-quality images",
-                  "Manage your creations"
-                ].map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-3 sm:space-x-4">
+                {features.map((feature) => (
+                  <div key={feature} className="flex items-center space-x-3 sm:space-x-4">
                     <div className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      <CheckIcon />
                     </div>
                     <span className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300">
                       {feature}
@@ -93,13 +125,14 @@ export default function Login() {
                 </p>
               </div>
 
-              {error && (
+              {/* Form-level error message */}
+              {errors.root?.serverError && (
                 <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg sm:rounded-xl">
                   <div className="flex items-center justify-center space-x-2">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-red-700 dark:text-red-300 text-xs sm:text-sm">{error}</span>
+                    <WarningIcon />
+                    <span className="text-red-700 dark:text-red-300 text-xs sm:text-sm">
+                      {errors.root.serverError.message}
+                    </span>
                   </div>
                 </div>
               )}
@@ -112,9 +145,25 @@ export default function Login() {
                   <input
                     type="email"
                     placeholder="Enter your email"
-                    {...register('email', { required: true })}
-                    className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                    aria-invalid={errors.email ? "true" : "false"}
+                    {...register('email', { 
+                      required: 'Email is required',
+                      pattern: {
+                        value: /^\S+@\S+$/i,
+                        message: 'Please enter a valid email address'
+                      }
+                    })}
+                    className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200 ${
+                      errors.email 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                    }`}
                   />
+                  {errors.email && (
+                    <p className="mt-2 text-xs sm:text-sm text-red-500" role="alert">
+                      {errors.email.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -124,19 +173,31 @@ export default function Login() {
                   <input
                     type="password"
                     placeholder="Enter your password"
-                    {...register('password', { required: true })}
-                    className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+                    aria-invalid={errors.password ? "true" : "false"}
+                    {...register('password', { 
+                      required: 'Password is required' 
+                    })}
+                    className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-white dark:bg-gray-800 border rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200 ${
+                      errors.password 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                    }`}
                   />
+                  {errors.password && (
+                    <p className="mt-2 text-xs sm:text-sm text-red-500" role="alert">
+                      {errors.password.message}
+                    </p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={isSubmitting} // Use RHF's state
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 sm:py-4 rounded-lg sm:rounded-xl font-medium text-sm sm:text-base lg:text-lg shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2 sm:space-x-3"
                 >
-                  {loading ? (
+                  {isSubmitting ? (
                     <>
-                      <div className="animate-spin h-4 w-4 sm:h-5 sm:w-5 text-white border-2 rounded-full border-t-white"></div>
+                      <SpinnerIcon />
                       <span className="text-sm sm:text-base">Signing in...</span>
                     </>
                   ) : (
